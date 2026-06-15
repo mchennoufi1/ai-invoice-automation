@@ -1,9 +1,11 @@
 import shutil
+import csv
+import os
 from pathlib import Path
+from datetime import datetime
 
 from fastapi import FastAPI, UploadFile, HTTPException, Depends
 from fastapi.responses import JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
 
 from ocr import load_file_for_claude
 from llm import extract_invoice_data, summarize_and_validate
@@ -40,6 +42,31 @@ def list_invoices():
 @app.get("/stats")
 def stats():
     return get_stats()
+
+
+@app.get("/export-csv")
+def export_all_csv():
+    invoices = get_all_invoices()
+    if not invoices:
+        raise HTTPException(status_code=404, detail="No invoices found")
+
+    path = f"exports/all_invoices_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+
+    with open(path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=[
+            "id", "invoice_number", "vendor_name", "invoice_date",
+            "due_date", "currency", "subtotal", "vat_rate", "vat_amount",
+            "total_amount", "payment_method", "summary", "is_valid",
+            "flags", "processed_at"
+        ])
+        writer.writeheader()
+        for inv in invoices:
+            inv["flags"] = "; ".join(inv["flags"]) if inv["flags"] else ""
+            inv.pop("line_items", None)
+            inv.pop("fingerprint", None)
+            writer.writerow({k: inv.get(k) for k in writer.fieldnames})
+
+    return FileResponse(path, media_type="text/csv", filename="invoices_export.csv")
 
 
 @app.post("/upload-invoice")
@@ -95,7 +122,6 @@ async def upload_batch(files: list[UploadFile], _=Depends(require_api_key)):
 
     return {"status": "batch_complete", "processed": len(results), "results": results}
 
-from fastapi.responses import FileResponse
 
 @app.get("/app")
 def frontend():
