@@ -92,3 +92,9 @@ async def upload_batch(files: list[UploadFile]):
         })
 
     return {"status": "batch_complete", "processed": len(results), "results": results}
+import os
+
+@app.get("/debug-env")
+def debug_env():
+    key = os.environ.get("ANTHROPIC_API_KEY", "NOT FOUND")
+    return {"key_present": key != "NOT FOUND", "key_prefix": key[:12] if key != "NOT FOUND" else "none"}
