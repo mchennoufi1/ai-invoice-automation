@@ -103,3 +103,24 @@ Traditional OCR (Tesseract) extracts raw text, then you need a second LLM call t
 - Accounting firms automating invoice intake
 - Logistics companies processing supplier invoices at scale
 - SMEs in NL/EU replacing manual data entry
+
+## Authentication
+
+All upload endpoints require an `X-API-Key` header:
+
+```bash
+curl -X POST https://your-url.railway.app/upload-invoice \
+  -F "file=@invoice.pdf" \
+  -H "X-API-Key: your-key"
+```
+
+## Database
+
+Invoice data is stored in SQLite. Additional endpoints:
+
+- `GET /invoices` — list all processed invoices
+- `GET /stats` — total invoices, total value, average value, flagged count
+
+## Frontend
+
+Visit `/app` for the drag-and-drop dashboard.
