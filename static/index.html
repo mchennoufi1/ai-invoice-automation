@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Invoice Processor</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .container { max-width: 860px; margin: 0 auto; }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+
+    /* Stats bar */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: 10px;
+      padding: 16px;
+      border: 1px solid #e5e5e5;
+    }
+
+    .stat-card .label {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    .stat-card .value {
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    .stat-card .value.flagged { color: #e53e3e; }
+
+    /* Upload zone */
+    .upload-zone {
+      background: white;
+      border: 2px dashed #d0d0d0;
+      border-radius: 12px;
+      padding: 48px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      margin-bottom: 28px;
+    }
+
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: #5c6bc0;
+      background: #f8f8ff;
+    }
+
+    .upload-zone .icon { font-size: 40px; margin-bottom: 12px; }
+    .upload-zone h2 { font-size: 16px; font-weight: 500; margin-bottom: 6px; }
+    .upload-zone p { font-size: 13px; color: #888; }
+
+    #file-input { display: none; }
+
+    /* Status */
+    .status {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 18px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+	.status.loading { background: #eff6ff; color: #1d4ed8; }
+	.status.error   { background: #fef2f2; color: #dc2626; }
+	.status.duplicate { background: #fffbeb; color: #b45309; }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Result card */
+    .result-card {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #e5e5e5;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .result-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .result-header h3 { font-size: 16px; font-weight: 600; }
+    .result-header .summary { font-size: 13px; color: #666; margin-top: 4px; max-width: 560px; }
+
+    .badge {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 10px;
+      border-radius: 20px;
+      flex-shrink: 0;
+    }
+
+    .badge.valid   { background: #dcfce7; color: #166534; }
+    .badge.invalid { background: #fee2e2; color: #991b1b; }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+
+    .field {
+      padding: 12px 20px;
+      border-bottom: 1px solid #f5f5f5;
+    }
+
+    .field:nth-child(odd) { border-right: 1px solid #f5f5f5; }
+    .field .key { font-size: 11px; color: #888; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .field .val { font-size: 14px; font-weight: 500; }
+
+    /* Line items table */
+    .line-items { padding: 16px 20px; }
+    .line-items h4 { font-size: 13px; color: #888; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 6px 8px; color: #888; font-weight: 500; border-bottom: 1px solid #f0f0f0; }
+    td { padding: 8px 8px; border-bottom: 1px solid #fafafa; }
+    tr:last-child td { border-bottom: none; }
+
+    /* Flags */
+    .flags { padding: 12px 20px; background: #fffbeb; border-top: 1px solid #fef3c7; }
+    .flags .flag { font-size: 13px; color: #92400e; }
+
+    /* Invoice history */
+    .history { margin-top: 32px; }
+    .history h2 { font-size: 16px; font-weight: 600; margin-bottom: 14px; }
+
+    .history-table { background: white; border-radius: 10px; border: 1px solid #e5e5e5; overflow: hidden; }
+    .history-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .history-table th { background: #fafafa; padding: 10px 14px; text-align: left; font-weight: 500; color: #555; border-bottom: 1px solid #e5e5e5; }
+    .history-table td { padding: 10px 14px; border-bottom: 1px solid #f5f5f5; }
+    .history-table tr:last-child td { border-bottom: none; }
+    .history-table .valid-dot   { color: #16a34a; }
+    .history-table .invalid-dot { color: #dc2626; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>AI Invoice Processor</h1>
+  <p class="subtitle">Upload an invoice PDF or image — Claude extracts, validates, and stores the data automatically.</p>
+
+  <div class="stats" id="stats">
+    <div class="stat-card"><div class="label">Total invoices</div><div class="value" id="stat-total">—</div></div>
+    <div class="stat-card"><div class="label">Total value</div><div class="value" id="stat-value">—</div></div>
+    <div class="stat-card"><div class="label">Average value</div><div class="value" id="stat-avg">—</div></div>
+    <div class="stat-card"><div class="label">Flagged</div><div class="value flagged" id="stat-flagged">—</div></div>
+  </div>
+
+  <div class="upload-zone" id="drop-zone">
+    <div class="icon">📄</div>
+    <h2>Drop your invoice here</h2>
+    <p>PDF, JPG, PNG or WEBP · Click to browse</p>
+    <input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png,.webp">
+  </div>
+
+  <div class="status loading" id="status-loading">
+    <div class="spinner"></div>
+    <span>Processing invoice with Claude Vision...</span>
+  </div>
+
+  <div class="status error" id="status-error">
+    <span>❌</span><span id="error-msg">Something went wrong.</span>
+  </div>
+
+  <div class="status duplicate" id="status-duplicate">
+    <span>⚠️</span><span>Duplicate invoice detected — this invoice was already processed.</span>
+  </div>
+
+  <div id="result"></div>
+
+  <div class="history">
+    <h2>Processed invoices</h2>
+    <div class="history-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Invoice #</th>
+            <th>Vendor</th>
+            <th>Date</th>
+            <th>Total</th>
+            <th>Valid</th>
+          </tr>
+        </thead>
+        <tbody id="history-body">
+          <tr><td colspan="5" style="color:#aaa;text-align:center;padding:20px">No invoices yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const dropZone   = document.getElementById('drop-zone');
+  const fileInput  = document.getElementById('file-input');
+
+  // Click to browse
+  dropZone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+  // Drag and drop
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    handleFile(e.dataTransfer.files[0]);
+  });
+
+  function showStatus(id) {
+    ['status-loading','status-error','status-duplicate'].forEach(s => {
+      document.getElementById(s).style.display = 'none';
+      document.getElementById(s).className = 'status ' + s.replace('status-','');
+    });
+    if (id) document.getElementById(id).style.display = 'flex';
+  }
+
+  async function handleFile(file) {
+    if (!file) return;
+    showStatus('status-loading');
+    document.getElementById('result').innerHTML = '';
+
+    const form = new FormData();
+    form.append('file', file);
+
+    try {
+      const res = await fetch('/upload-invoice', { method: 'POST', body: form });
+      const data = await res.json();
+
+      if (res.status === 409) {
+        showStatus('status-duplicate');
+        return;
+      }
+
+      if (!res.ok) {
+        showStatus('status-error');
+        document.getElementById('error-msg').textContent = data.detail || 'Unknown error';
+        return;
+      }
+
+      showStatus(null);
+      renderResult(data);
+      loadStats();
+      loadHistory();
+
+    } catch (err) {
+      showStatus('status-error');
+      document.getElementById('error-msg').textContent = err.message;
+    }
+  }
+
+  function fmt(val, currency) {
+    if (val == null) return '—';
+    return currency ? `${currency} ${val.toFixed(2)}` : val;
+  }
+
+  function renderResult(data) {
+    const d = data.data;
+    const v = data.validation;
+    const currency = d.currency || '';
+
+    const flags = v.flags && v.flags.length
+      ? `<div class="flags">${v.flags.map(f => `<div class="flag">⚠️ ${f}</div>`).join('')}</div>`
+      : '';
+
+    const rows = (d.line_items || []).map(li => `
+      <tr>
+        <td>${li.description}</td>
+        <td>${li.quantity}</td>
+        <td>${currency} ${li.unit_price?.toFixed(2)}</td>
+        <td>${currency} ${li.total?.toFixed(2)}</td>
+</tr>`).join('');
+
+    document.getElementById('result').innerHTML = `
+      <div class="result-card">
+        <div class="result-header">
+          <div>
+            <h3>${d.vendor_name || 'Unknown vendor'} · ${d.invoice_number || 'No number'}</h3>
+            <div class="summary">${v.summary || ''}</div>
+          </div>
+          <span class="badge ${v.is_valid ? 'valid' : 'invalid'}">${v.is_valid ? '✓ Valid' : '✗ Invalid'}</span>
+        </div>
+        <div class="result-grid">
+          <div class="field"><div class="key">Invoice date</div><div class="val">${d.invoice_date || '—'}</div></div>
+          <div class="field"><div class="key">Due date</div><div class="val">${d.due_date || '—'}</div></div>
+          <div class="field"><div class="key">Subtotal</div><div class="val">${fmt(d.subtotal, currency)}</div></div>
+          <div class="field"><div class="key">VAT (${d.vat_rate || 0}%)</div><div class="val">${fmt(d.vat_amount, currency)}</div></div>
+          <div class="field"><div class="key">Total</div><div class="val">${fmt(d.total_amount, currency)}</div></div>
+          <div class="field"><div class="key">Payment</div><div class="val">${d.payment_method || '—'}</div></div>
+        </div>
+        <div class="line-items">
+          <h4>Line items</h4>
+          <table>
+            <thead><tr><th>Description</th><th>Qty</th><th>Unit price</th><th>Total</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        ${flags}
+      </div>`;
+  }
+
+  async function loadStats() {
+    const res = await fetch('/stats');
+    const d = await res.json();
+    document.getElementById('stat-total').textContent = d.total_invoices ?? '—';
+    document.getElementById('stat-value').textContent = d.total_value ? `€${d.total_value.toFixed(2)}` : '—';
+    document.getElementById('stat-avg').textContent = d.avg_value ? `€${d.avg_value.toFixed(2)}` : '—';
+    document.getElementById('stat-flagged').textContent = d.flagged_count ?? '—';
+  }
+
+  async function loadHistory() {
+    const res = await fetch('/invoices');
+    const d = await res.json();
+    const body = document.getElementById('history-body');
+    if (!d.invoices.length) return;
+    body.innerHTML = d.invoices.map(inv => `
+      <tr>
+        <td>${inv.invoice_number || '—'}</td>
+        <td>${inv.vendor_name || '—'}</td>
+        <td>${inv.invoice_date || '—'}</td>
+        <td>${inv.currency || ''} ${inv.total_amount?.toFixed(2) || '—'}</td>
+        <td class="${inv.is_valid ? 'valid-dot' : 'invalid-dot'}">${inv.is_valid ? '✓' : '✗'}</td>
+      </tr>`).join('');
+  }
+
+  // Load on page open
+  loadStats();
+  loadHistory();
+</script>
+</body>
+</html>
