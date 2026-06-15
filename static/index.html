@@ -277,7 +277,7 @@
 
       if (!res.ok) {
         showStatus('status-error');
-        document.getElementById('error-msg').textContent = data.detail || 'Unknown error';
+        document.getElementById('error-msg').textContent = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail) || 'Unknown error';
         return;
       }
 
