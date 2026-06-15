@@ -267,7 +267,11 @@
     form.append('file', file);
 
     try {
-      const res = await fetch('/upload-invoice', { method: 'POST', body: form });
+      const res = await fetch('/upload-invoice', {
+        method: 'POST',
+        body: form,
+        headers: { 'X-API-Key': 'invoice-secret-key-6093682fa0c907df206511c1' }
+      });
       const data = await res.json();
 
       if (res.status === 409) {
